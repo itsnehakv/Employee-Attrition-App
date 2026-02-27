@@ -10,17 +10,17 @@ model = joblib.load('attrition_model.pkl')
 model_columns = joblib.load('model_columns.pkl')
 
 class Employee(BaseModel):
-    Salary: int
+    Salary: int #
     Sex: int # 0/1
     EngagementSurvey: float
-    EmpSatisfaction: int
+    EmpSatisfaction: int #
     SpecialProjectsCount: int
     DaysLateLast30: int
     Absences: int
-    Age: int
-    Department: str
-    Position: str
-    RecruitmentSource: str
+    Age: int #
+    Department: str #
+    Position: str #
+    RecruitmentSource: str #
     PerformanceScore: str
 
 @app.post("/predict")
