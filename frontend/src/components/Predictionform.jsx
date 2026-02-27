@@ -64,18 +64,14 @@ const PredictorForm = () => {
   const [posQuery, setPosQuery] = useState("");
   const [sourceQuery, setSourceQuery] = useState("");
   const [activeList, setActiveList] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [prediction, setPrediction] = useState(null);
 
   const filteredPositions =
     posQuery === ""
       ? []
       : POSITIONS.filter((p) =>
           p.toLowerCase().includes(posQuery.toLowerCase())
-        );
-  const filteredSources =
-    sourceQuery === ""
-      ? []
-      : SOURCES.filter((s) =>
-          s.toLowerCase().includes(sourceQuery.toLowerCase())
         );
 
   const handleSubmit = (e) => {
