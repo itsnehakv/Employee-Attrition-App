@@ -28,7 +28,7 @@ const Navbar = () => {
               }`
             }
           >
-            {/* The "Sliding" Text Animation */}
+            {/*Text Animation */}
             <span className="block group-hover:-translate-y-full transition-transform duration-300">
               {item}
             </span>

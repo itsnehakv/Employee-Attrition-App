@@ -1,8 +1,11 @@
 import { Routes, Route } from "react-router-dom";
 import Navbar from "./components/Navbar";
-import PredictorForm from "./components/Predictionform";
+import Predictionform from "./components/Predictionform";
+import { useState } from "react";
+import ReportsDashboard from "./components/ReportsDashboard";
 
 function App() {
+  const [prediction, setPrediction] = useState(null);
   return (
     <div className="min-h-screen bg-black overflow-x-hidden">
       <div className="max-w-7xl mx-auto pt-4">
@@ -27,9 +30,16 @@ function App() {
               </div>
             }
           />
-
           {/* PREDICTOR VIEW */}
-          <Route path="/predictor" element={<PredictorForm />} />
+          <Route
+            path="/predictor"
+            element={<Predictionform setGlobalPrediction={setPrediction} />}
+          />{" "}
+          {/* REPORTS */}
+          <Route
+            path="/reports"
+            element={<ReportsDashboard prediction={prediction} />}
+          />
         </Routes>
       </main>
     </div>
