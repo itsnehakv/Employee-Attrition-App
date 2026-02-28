@@ -4,7 +4,7 @@ import { NavLink } from "react-router-dom";
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
 
-  const navItems = ["Dashboard", "Predictor", "Analytics", "Reports"];
+  const navItems = ["Dashboard", "Predictor", "Reports", "Analytics"];
 
   return (
     <nav className="flex items-center border mx-4 mt-4 max-md:w-full max-md:justify-between border-slate-700 px-6 py-4 rounded-full text-white text-sm bg-black/50 backdrop-blur-md relative z-50">
@@ -45,13 +45,10 @@ const Navbar = () => {
           href="https://www.linkedin.com/in/nehakvallappil"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-center border border-slate-600 hover:bg-slate-800 px-4 py-2 rounded-full text-sm font-medium transition duration-300 text-white"
+          className="bg-white hover:shadow-[0px_0px_30px_14px] shadow-[0px_0px_30px_7px] hover:shadow-white/50 shadow-white/50 text-black px-4 py-2 rounded-full text-sm font-medium hover:bg-slate-100 transition duration-300"
         >
           Contact
         </a>
-        <button className="bg-white hover:shadow-[0px_0px_30px_14px] shadow-[0px_0px_30px_7px] hover:shadow-white/50 shadow-white/50 text-black px-4 py-2 rounded-full text-sm font-medium hover:bg-slate-100 transition duration-300">
-          Run Model
-        </button>
       </div>
 
       {/* Mobile Menu Toggle */}
