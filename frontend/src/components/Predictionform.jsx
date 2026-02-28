@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import RiskGauge from "./RiskGauge";
 
 const POSITIONS = [
   "Production Technician I",
@@ -34,19 +35,7 @@ const POSITIONS = [
   "CIO",
 ];
 
-const SOURCES = [
-  "LinkedIn",
-  "Indeed",
-  "Google Search",
-  "Employee Referral",
-  "Diversity Job Fair",
-  "On-line Web application",
-  "CareerBuilder",
-  "Website",
-  "Other",
-];
-
-const PredictorForm = () => {
+const Predictionform = () => {
   const [formData, setFormData] = useState({
     Salary: 5000,
     Sex: 0,
@@ -56,16 +45,17 @@ const PredictorForm = () => {
     DaysLateLast30: 0,
     Absences: 0,
     Age: 0,
-    Department: "production",
+    Department: "Production",
     Position: "",
     RecruitmentSource: "",
     PerformanceScore: "Fully Meets",
   });
   const [posQuery, setPosQuery] = useState("");
-  const [sourceQuery, setSourceQuery] = useState("");
   const [activeList, setActiveList] = useState(null);
   const [loading, setLoading] = useState(false);
   const [prediction, setPrediction] = useState(null);
+
+  const resultsRef = useRef(null);
 
   const filteredPositions =
     posQuery === ""
@@ -74,19 +64,57 @@ const PredictorForm = () => {
           p.toLowerCase().includes(posQuery.toLowerCase())
         );
 
+  // Scroll to results when prediction is received/ prediction state changes
+  useEffect(() => {
+    if (prediction && resultsRef.current) {
+      resultsRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [prediction]);
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Ensure numbers are sent as numbers, not strings
+
+    //FOR DEBUGGING PURPOSES ONLY - REMOVE LATER
+    console.log("1. Submit Clicked");
+    setLoading(true);
+
     const payload = {
-      ...formData,
-      Salary: parseInt(formData.Salary),
-      Age: parseInt(formData.Age),
-      SpecialProjectsCount: parseInt(formData.SpecialProjectsCount),
-      DaysLateLast30: parseInt(formData.DaysLateLast30),
-      Absences: parseInt(formData.Absences),
-      EngagementSurvey: parseFloat(formData.EngagementSurvey),
+      Salary: Number(formData.Salary) || 0,
+      Sex: Number(formData.Sex) || 0,
+      EngagementSurvey: Number(formData.EngagementSurvey) || 0,
+      EmpSatisfaction: Number(formData.EmpSatisfaction) || 0,
+      SpecialProjectsCount: Number(formData.SpecialProjectsCount) || 0,
+      DaysLateLast30: Number(formData.DaysLateLast30) || 0,
+      Absences: Number(formData.Absences) || 0,
+      Age: Number(formData.Age) || 0,
+      Department: String(formData.Department),
+      Position: String(formData.Position),
+      RecruitmentSource: String(formData.RecruitmentSource),
+      PerformanceScore: String(formData.PerformanceScore),
     };
-    console.log("Payload for main.py:", payload);
+
+    console.log("2. Payload ready:", payload);
+
+    fetch("http://127.0.0.1:8080/predictor", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+      .then((response) => {
+        console.log("3. Server responded:", response.status);
+        if (!response.ok) throw new Error("Network response was not ok");
+        return response.json();
+      })
+      .then((data) => {
+        console.log("4. Prediction received:", data);
+        setPrediction(data);
+      })
+      .catch((error) => {
+        console.error("5. CATCH ERROR:", error);
+      })
+      .finally(() => {
+        console.log("6. Loading finished");
+        setLoading(false);
+      });
   };
 
   return (
@@ -94,7 +122,6 @@ const PredictorForm = () => {
       <h2 className="text-2xl font-bold mb-6 text-blue-400">
         Employee Risk Assessment
       </h2>
-
       <form
         onSubmit={handleSubmit}
         className="grid grid-cols-1 md:grid-cols-2 gap-6"
@@ -111,22 +138,22 @@ const PredictorForm = () => {
                 setFormData({ ...formData, Department: e.target.value })
               }
             >
-              <option className="bg-slate-900" value="Production       ">
+              <option className="bg-slate-900" value="Production">
                 Production
               </option>
-              <option className="bg-slate-900" value="it/is">
+              <option className="bg-slate-900" value="IT/IS">
                 IT/IS
               </option>
-              <option className="bg-slate-900" value="software engineering">
+              <option className="bg-slate-900" value="Software Engineering">
                 Software Engineering
               </option>
-              <option className="bg-slate-900" value="admin offices">
+              <option className="bg-slate-900" value="Admin Offices">
                 Admin Offices
               </option>
-              <option className="bg-slate-900" value="sales">
+              <option className="bg-slate-900" value="Sales">
                 Sales
               </option>
-              <option className="bg-slate-900" value="executive office">
+              <option className="bg-slate-900" value="Executive Office">
                 Executive Office
               </option>
             </select>
@@ -222,7 +249,7 @@ const PredictorForm = () => {
                 type="button"
                 onClick={() => setFormData({ ...formData, Sex: val })}
                 className={`flex-1 py-2 rounded-lg transition ${
-                  formData.Sex === val ? "bg-blue-600" : "text-slate-400"
+                  formData.Sex === val ? "bg-blue-700" : "text-slate-400"
                 }`}
               >
                 {val === 0 ? "Male" : "Female"}
@@ -306,10 +333,30 @@ const PredictorForm = () => {
               setFormData({ ...formData, PerformanceScore: e.target.value })
             }
           >
-            <option value="Fully Meets">Fully Meets</option>
-            <option value="Exceeds">Exceeds</option>
-            <option value="Needs Improvement">Needs Improvement</option>
-            <option value="PIP">PIP</option>
+            <option
+              value="Fully Meets"
+              className="
+            bg-slate-900"
+            >
+              Fully Meets
+            </option>
+            <option
+              value="Exceeds"
+              className="
+            bg-slate-900"
+            >
+              Exceeds
+            </option>
+            <option
+              value="Needs Improvement"
+              className="
+            bg-slate-900"
+            >
+              Needs Improvement
+            </option>
+            <option value="PIP" className="bg-slate-900">
+              PIP
+            </option>
           </select>
         </div>
 
@@ -421,14 +468,65 @@ const PredictorForm = () => {
         <div className="md:col-span-2 mt-4">
           <button
             type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl shadow-[0px_0px_20px_rgba(37,99,235,0.4)] transition duration-300"
+            disabled={loading}
+            className={`w-full font-bold py-4 rounded-2xl shadow-lg transition duration-300 ${
+              loading
+                ? "bg-slate-700 cursor-not-allowed"
+                : "bg-blue-700 hover:bg-blue-500 text-white"
+            }`}
           >
-            Analyze Retention Risk
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg
+                  className="animate-spin h-5 w-5 text-white"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    fill="none"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                Processing AI Insights...
+              </span>
+            ) : (
+              "Analyze Retention Risk"
+            )}
           </button>
         </div>
       </form>
+      <div ref={resultsRef} className="mt-12 pt-8 border-t border-slate-800">
+        {prediction && (
+          <div className="animate-in fade-in slide-in-from-bottom-8 duration-1000 flex flex-col items-center">
+            <h3 className="text-slate-400 uppercase text-xs font-black tracking-widest mb-8">
+              AI Analysis Result
+            </h3>
+            <RiskGauge
+              percentage={prediction.attrition_risk_percent}
+              riskLevel={prediction.prediction}
+            />
+
+            {/* Actionable Button to go to the full Reports page */}
+            <button
+              className="mt-8 text-blue-400 hover:text-blue-300 text-sm font-semibold underline underline-offset-4"
+              onClick={() => (window.location.hash = "/reports")}
+            >
+              View Full Detailed Report →
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
-export default PredictorForm;
+export default Predictionform;
