@@ -1,13 +1,25 @@
 import { Routes, Route } from "react-router-dom";
+import { useEffect } from "react";
 import Navbar from "./components/Navbar";
 import Predictionform from "./components/Predictionform";
 import { useState } from "react";
 import ReportsDashboard from "./components/ReportsDashboard";
 
 function App() {
-  const [prediction, setPrediction] = useState(null);
+  const [globalPrediction, setGlobalPrediction] = useState(null);
+  const [prediction, setPrediction] = useState(() => {
+    const saved = localStorage.getItem("last_prediction");
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  useEffect(() => {
+    if (prediction) {
+      localStorage.setItem("last_prediction", JSON.stringify(prediction));
+    }
+  }, [prediction]);
+
   return (
-    <div className="min-h-screen bg-black overflow-x-hidden">
+    <div className="min-h-screen bg-black overflow-x-hidden no-scrollbar">
       <div className="max-w-7xl mx-auto pt-4">
         <Navbar />
       </div>
@@ -16,7 +28,7 @@ function App() {
         <Routes>
           {/* HOME VIEW */}
           <Route
-            path="/dashboard"
+            path="/"
             element={
               <div className="flex flex-col items-center justify-center mt-32 text-center px-4">
                 <h1 className="text-6xl font-bold text-white tracking-tight mb-4 animate-in fade-in slide-in-from-bottom-4 duration-1000">
@@ -33,12 +45,17 @@ function App() {
           {/* PREDICTOR VIEW */}
           <Route
             path="/predictor"
-            element={<Predictionform setGlobalPrediction={setPrediction} />}
+            element={
+              <Predictionform
+                prediction={prediction}
+                setGlobalPrediction={setPrediction}
+              />
+            }
           />{" "}
           {/* REPORTS */}
           <Route
             path="/reports"
-            element={<ReportsDashboard prediction={prediction} />}
+            element={<ReportsDashboard prediction={globalPrediction} />}
           />
         </Routes>
       </main>

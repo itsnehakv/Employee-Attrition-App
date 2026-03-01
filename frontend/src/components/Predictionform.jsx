@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import RiskGauge from "./RiskGauge";
+import { useNavigate } from "react-router-dom";
 
 const POSITIONS = [
   "Production Technician I",
@@ -35,7 +36,12 @@ const POSITIONS = [
   "CIO",
 ];
 
-const Predictionform = () => {
+/* setGlobalPrediction is passed down from App.jsx to allow the Predictionform to update the global state with 
+the latest prediction, which is then accessed by the ReportsDashboard to display data */
+const Predictionform = ({
+  prediction: globalPrediction,
+  setGlobalPrediction,
+}) => {
   const [formData, setFormData] = useState({
     Salary: 5000,
     Sex: 0,
@@ -53,9 +59,12 @@ const Predictionform = () => {
   const [posQuery, setPosQuery] = useState("");
   const [activeList, setActiveList] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [prediction, setPrediction] = useState(null);
+  const [prediction, setPrediction] = useState(globalPrediction || null);
+  const [isUploading, setIsUploading] = useState(false); // For Upload PDF
 
   const resultsRef = useRef(null);
+
+  const navigate = useNavigate();
 
   const filteredPositions =
     posQuery === ""
@@ -64,19 +73,43 @@ const Predictionform = () => {
           p.toLowerCase().includes(posQuery.toLowerCase())
         );
 
-  // Scroll to results when prediction is received/ prediction state changes
+  // Scroll to results when prediction is received/prediction state changes
   useEffect(() => {
+    if (globalPrediction) {
+      setPrediction(globalPrediction);
+    }
     if (prediction && resultsRef.current) {
       resultsRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  }, [prediction]);
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  }, [globalPrediction, prediction]);
 
-    //FOR DEBUGGING PURPOSES ONLY - REMOVE LATER
-    console.log("1. Submit Clicked");
+  const handleReset = () => {
+    // Reset Form Fields
+    setFormData({
+      Salary: 5000,
+      Sex: 0,
+      EngagementSurvey: 0.0,
+      EmpSatisfaction: 3,
+      SpecialProjectsCount: 0,
+      DaysLateLast30: 0,
+      Absences: 0,
+      Age: 0,
+      Department: "Production",
+      Position: "",
+      RecruitmentSource: "",
+      PerformanceScore: "Fully Meets",
+    });
+    setPosQuery(""); // Clear the autocomplete text
+    setPrediction(null); // Hide gauge
+
+    setGlobalPrediction?.(null);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     setLoading(true);
 
+    // To ensure datatype is as required by backend/model
     const payload = {
       Salary: Number(formData.Salary) || 0,
       Sex: Number(formData.Sex) || 0,
@@ -92,36 +125,163 @@ const Predictionform = () => {
       PerformanceScore: String(formData.PerformanceScore),
     };
 
-    console.log("2. Payload ready:", payload);
-
-    fetch("http://127.0.0.1:8080/predictor", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    })
-      .then((response) => {
-        console.log("3. Server responded:", response.status);
-        if (!response.ok) throw new Error("Network response was not ok");
-        return response.json();
-      })
-      .then((data) => {
-        console.log("4. Prediction received:", data);
-        setPrediction(data);
-      })
-      .catch((error) => {
-        console.error("5. CATCH ERROR:", error);
-      })
-      .finally(() => {
-        console.log("6. Loading finished");
-        setLoading(false);
+    try {
+      const response = await fetch("http://127.0.0.1:8000/predictor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
+
+      if (!response.ok) throw new Error("Network response was not ok");
+
+      const data = await response.json();
+
+      const fullReport = {
+        ...data, // Includes prediction and risk percent
+        input_data: payload, // Attach the inputs so they can be displayed in the reports dashboard
+      };
+
+      console.log("Saving to Global State:", fullReport);
+
+      // Update local and global state
+      setPrediction(fullReport);
+      if (setGlobalPrediction) {
+        setGlobalPrediction(fullReport);
+      }
+
+      const dbResponse = await fetch("http://127.0.0.1:8000/api/save-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fullReport),
+      });
+
+      if (dbResponse.ok) {
+        console.log("✅ Report saved to Database");
+      }
+
+      if (dbResponse.ok) {
+        console.log("✅ Report saved to Database");
+      }
+    } catch (error) {
+      console.error("Submission Error:", error);
+    } finally {
+      setLoading(false); // Button goes back to normal state/clickable
+    }
+  };
+
+  /*------------------------------------------------------------------------------------------------*/
+  // UPLOAD PDF
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    console.log("🚀 Starting upload for:", file.name);
+    setIsUploading(true);
+
+    const uploadData = new FormData();
+    uploadData.append("file", file);
+
+    //If uploading takes longer than 15 seconds, abort the request to prevent hanging
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const response = await fetch("http://127.0.0.1:8000/api/upload-pdf", {
+        method: "POST",
+        body: uploadData,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      console.log("📡 Response status:", response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Server Error: ${errorText}`);
+      }
+
+      const extractedData = await response.json();
+      console.log("✅ Data extracted successfully:", extractedData);
+
+      setFormData((prev) => ({
+        ...prev,
+        ...extractedData,
+      }));
+
+      if (extractedData.Position) {
+        setPosQuery(extractedData.Position);
+      }
+    } catch (error) {
+      console.error("❌ PDF Upload Error:", error);
+      alert(
+        "Upload failed! Check if FastAPI is running and look at the terminal for errors."
+      );
+    } finally {
+      console.log("🏁 Upload process finished.");
+      setIsUploading(false); // This STOPS the loading state
+    }
   };
 
   return (
     <div className="max-w-4xl mx-auto p-8 bg-slate-900/50 backdrop-blur-xl border border-slate-700 rounded-3xl text-white shadow-2xl">
-      <h2 className="text-2xl font-bold mb-6 text-blue-400">
-        Employee Risk Assessment
-      </h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-blue-400">
+          Employee Risk Assessment
+        </h2>
+
+        {/* Reset Button */}
+        <button
+          type="button"
+          onClick={handleReset}
+          className="text-xs uppercase tracking-widest text-slate-500 hover:text-orange-800 transition-colors font-bold"
+        >
+          [ Reset Form ]
+        </button>
+      </div>
+
+      {/* Upload PDF */}
+      <div className="mb-8 p-6 border-2 border-dashed border-slate-800 rounded-[2rem] bg-slate-900/20 hover:bg-slate-800/40 transition-all group relative">
+        <input
+          type="file"
+          id="pdf-upload"
+          className="hidden"
+          onChange={handleFileUpload}
+          accept=".pdf"
+        />
+        <label
+          htmlFor="pdf-upload"
+          className="flex flex-col items-center justify-center cursor-pointer"
+        >
+          <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+            {isUploading ? (
+              <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <svg
+                className="w-6 h-6 text-blue-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                />
+              </svg>
+            )}
+          </div>
+          <span className="text-sm font-bold text-white tracking-wide">
+            {isUploading
+              ? "Processing AI Extraction..."
+              : "Upload PDF to Auto-Fill Form"}
+          </span>
+          <span className="text-xs text-slate-500 mt-1">
+            Supports PDF format • Max 5MB
+          </span>
+        </label>
+      </div>
+
       <form
         onSubmit={handleSubmit}
         className="grid grid-cols-1 md:grid-cols-2 gap-6"
@@ -134,6 +294,7 @@ const Predictionform = () => {
           <div className="relative">
             <select
               className="w-full bg-black/40 border border-slate-600 p-3 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition appearance-none cursor-pointer text-white"
+              value={formData.Department}
               onChange={(e) =>
                 setFormData({ ...formData, Department: e.target.value })
               }
@@ -198,6 +359,7 @@ const Predictionform = () => {
                 <li
                   key={i}
                   className="p-3 hover:bg-blue-600 cursor-pointer text-sm"
+                  value={formData.Position}
                   onClick={() => {
                     setPosQuery(p);
                     setFormData({ ...formData, Position: p });
@@ -220,6 +382,7 @@ const Predictionform = () => {
             type="number"
             className="bg-black/40 border border-slate-600 p-3 rounded-xl focus:outline-none focus:border-blue-500 transition"
             placeholder="e.g. 5000"
+            value={formData.Salary}
             onChange={(e) =>
               setFormData({ ...formData, Salary: e.target.value })
             }
@@ -235,6 +398,7 @@ const Predictionform = () => {
             type="number"
             className="bg-black/40 border border-slate-600 p-3 rounded-xl focus:outline-none focus:border-blue-500 transition"
             placeholder="e.g. 34"
+            value={formData.Age}
             onChange={(e) => setFormData({ ...formData, Age: e.target.value })}
           />
         </div>
@@ -265,6 +429,7 @@ const Predictionform = () => {
           </label>
           <div className="relative">
             <select
+              value={formData.RecruitmentSource}
               className="w-full bg-black/40 border border-slate-600 p-3 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition appearance-none cursor-pointer text-white"
               onChange={(e) =>
                 setFormData({ ...formData, RecruitmentSource: e.target.value })
@@ -517,8 +682,13 @@ const Predictionform = () => {
 
             {/* Actionable Button to go to the full Reports page */}
             <button
-              className="mt-8 text-blue-400 hover:text-blue-300 text-sm font-semibold underline underline-offset-4"
-              onClick={() => (window.location.hash = "/reports")}
+              className="mt-8 text-blue-400 hover:text-blue-300 text-sm font-s emibold underline underline-offset-4"
+              onClick={() => {
+                setGlobalPrediction(prediction);
+                navigate("/reports", {
+                  state: { prediction: prediction },
+                });
+              }}
             >
               View Full Detailed Report →
             </button>
