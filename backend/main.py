@@ -119,69 +119,9 @@ async def delete_report(report_id: str):
     except Exception as e:
         raise HTTPException(status_code=400, detail="Invalid ID format")
 
-@app.get("/api/test-debug")
-async def test_debug():
-    print("📢 IF YOU SEE THIS, THE TERMINAL IS WORKING!", flush=True)
-    return {"status": "alive"}
-
 #----------------------------------------------------------------------------------------------------
 # For Upload PDF feature
 import fitz  # PyMuPDF
-
-# @app.post("/api/upload-pdf")
-# async def upload_pdf(file: UploadFile = File(...)):
-#     print(f"🚀 Received file: {file.filename}")
-#
-#     extracted_data = {
-#         "Position": "Unknown",
-#         "Salary": 5000,
-#         "Age": 30,
-#         "Department": "Production",
-#         "Sex": 0,
-#     }
-#     temp_path = f"temp_{file.filename}"
-#     try:
-#         # Save temp file
-#         with open(temp_path, "wb") as buffer:
-#             shutil.copyfileobj(file.file, buffer)
-#
-#         # Extract text
-#         doc = fitz.open(temp_path)
-#         resume_text = "".join([page.get_text() for page in doc])
-#         doc.close()
-#
-#         # Call Gemini
-#         # Note: Ensure hr_system_instruction is defined globally with the 31 positions
-#         response = client.models.generate_content(
-#             model="gemini-1.5-flash",
-#             config={
-#                 "response_mime_type": "application/json",
-#                 "temperature": 0.0,
-#                 "top_p": 0.1,  # Limits the "randomness" pool
-#             },
-#             contents=[hr_system_instruction, f"Resume content: {resume_text}"]
-#         )
-#         # Robust Parsing Logic
-#         raw_json_text = response.text.strip()
-#         # Clean markdown if Gemini wrapped it in ```json
-#         if "```" in raw_json_text:
-#             raw_json_text = raw_json_text.split("```")[1].replace("json", "").strip()
-#             print(f"📡 RAW API RESPONSE: {raw_json_text}")
-#
-#         extracted_data = json.loads(raw_json_text)
-#         print(f"✅ Parsed Data: {extracted_data}")
-#
-#     except Exception as e:
-#         print(f"❌ Extraction Error: {e}")
-#         # extracted_data remains as the default initialized above
-#
-#     finally:
-#         if os.path.exists(temp_path):
-#             os.remove(temp_path)
-#
-#         return extracted_data
-
-#UPLOAD PDF
 @app.post("/api/upload-pdf")
 async def upload_pdf(file: UploadFile = File(...)):
     print("\n" + "=" * 50)
@@ -232,7 +172,6 @@ async def upload_pdf(file: UploadFile = File(...)):
 
         ai_data = json.loads(raw_text)
 
-        # Aggressive mapping to ensure keys match your frontend
         for key, value in ai_data.items():
             norm_key = key.strip().capitalize()
             if norm_key in final_result:
@@ -269,13 +208,13 @@ async def save_report(payload: dict = Body(...)):
         print(f"❌ DB Save Error: {e}")
         raise HTTPException(status_code=500, detail="Failed to save report")
 
-# DASHBOARD STATS
 
+# DASHBOARD STATS
 '''
 *--------------------*
 $match, $group are MongoDB Operators
 The pipeline is a list w/ stages that happen one after another
-1. "$match": {"prediction": "High Risk"} --> Filters
+1. "$match": {"prediction": {"$regex": "High Risk", "$options": "i"} --> Filters | regex is to identify pattern "High Risk" | i means (case) insensitive 
 2. "$group": {"_id": "$Department", "count": {"$sum": 1} --> Categorize & Count
 3. "$sort": {"count": -1} --> Sorts by the count. The -1 means descending
 4. "$limit": 1 --> Selects the first item (which would have the highest risk)
@@ -294,15 +233,18 @@ async def get_stats():
         avg_result = await avg_cursor.to_list(length=1)
         avg_risk_val = avg_result[0]["avg_risk"] if avg_result else 0
 
+
         dept_pipeline = [
-            {"$match": {"prediction": "High Risk"}},
-            {"$group": {"_id": "$Department", "count": {"$sum": 1}}},
+            {"$match": {"prediction": {"$regex": "High Risk", "$options": "i"}}},
+            {"$group": {"_id": "$input_data.Department", "count": {"$sum": 1}}},
             {"$sort": {"count": -1}},
             {"$limit": 1}
         ]
+
         #.aggregate() sends the pipeline list to the MongoDB server/reports collection
         #dept_cursor is now a pointer to the data in server, its just a connection NOT data
         dept_cursor = app.database["reports"].aggregate(dept_pipeline)
+
         #here, cursor fetches data from db and is then converted to list
         dept_result = await dept_cursor.to_list(length=1)
         top_dept = dept_result[0]["_id"] if dept_result else "N/A"
@@ -310,8 +252,8 @@ async def get_stats():
         return {
             "total": total,
             "highRisk": high_risk,
-            "avgRisk": f"{round(avg_risk_val * 100)}%",
-            "topDept": top_dept  # Fixed: using the dynamic variable now
+            "avgRisk": f"{round(avg_risk_val)}%",
+            "topDept": top_dept
         }
     except Exception as e:
         print(f"❌ Stats Error: {e}")
@@ -320,7 +262,7 @@ async def get_stats():
 try:
     model = joblib.load('attrition_model.pkl')
     model_columns = joblib.load('model_columns.pkl')
-    print("✅ Backend Ready: Model and Columns Loaded")
+
 except Exception as e:
     print(f"❌ Backend Critical Error: {e}")
 
@@ -345,22 +287,24 @@ async def predictor(req: Request, emp: Employee | None = None):
     if req.method == "OPTIONS":
         return {}
 
-    # 👇 Make sure POST has a valid body
     if emp is None:
         raise HTTPException(status_code=400, detail="Missing request body")
 
-    # ---- Your prediction code ----
     data = emp.model_dump()
-    dept = data.pop('Department')
-    pos = data.pop('Position')
-    rec = data.pop('RecruitmentSource')
-    perf = data.pop('PerformanceScore')
+    dept = data.pop('Department').strip()
+    pos = data.pop('Position').strip()
+    rec = data.pop('RecruitmentSource').strip()
+    perf = data.pop('PerformanceScore').strip()
 
     df = pd.DataFrame([data])
     df[f"Department_{dept}"] = 1
     df[f"Position_{pos}"] = 1
     df[f"RecruitmentSource_{rec}"] = 1
     df[f"PerformanceScore_{perf}"] = 1
+
+    if dept == "Production":
+        # Dataset has a weirdly spaced column name for Department Production
+        df["Department_Production       "] = 1
 
     df = df.reindex(columns=model_columns, fill_value=0)
     df = df.loc[:, ~df.columns.duplicated()].copy()
