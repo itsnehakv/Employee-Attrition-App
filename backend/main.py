@@ -6,11 +6,13 @@ from pydantic import BaseModel #Handles the data validation layer, ensuring that
 from fastapi.middleware.cors import CORSMiddleware
 import joblib
 from dotenv import load_dotenv
-from fastapi import Body, UploadFile, File
+from fastapi import Body, UploadFile, File, Request
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorClient
+import sys
+import json
 #*-----------------------------*
 #For Upload PDF feature
 #*-----------------------------*
@@ -43,6 +45,11 @@ DEPARTMENTS = ["Production", "IT/IS", "Software Engineering", "Admin Offices", "
 
 hr_system_instruction = f"""
 You are a specialized HR Data Extractor. Your task is to extract information from CV text and format it as JSON.
+"INSTRUCTION: You are a DATA PARSER, not a writer. 
+LOCATE the 'Age' field in the text. 
+If the text says 'Age: 45', your JSON MUST contain 45. 
+DO NOT ESTIMATE. DO NOT CALCULATE. 
+IF DATA IS NOT EXPLICIT, RETURN THE DEFAULT: 30.
 
 STRICT RULES:
 2. **Position**: You MUST map the candidate's title to the CLOSEST match from this list: {POSITIONS}.
@@ -58,28 +65,35 @@ STRICT RULES:
 #*------------------------------*
 
 async def lifespan(app: FastAPI):
+    print("🚀 DEBUG: Entering Lifespan...", flush=True)
     uri = os.getenv("MONGO_URI")
-    app.mongodb_client = AsyncIOMotorClient(uri)
 
+    # serverSelectionTimeoutMS=2000 is CRITICAL.
+    # Without it, Motor hangs forever if the URI is wrong or DB is down.
+    app.mongodb_client = AsyncIOMotorClient(
+        uri,
+        serverSelectionTimeoutMS=2000,
+        connectTimeoutMS=2000
+    )
     app.database = app.mongodb_client.employee_attrition_db
 
     try:
-        # Ping with a timeout
+        print(f"🔗 DEBUG: Pinging MongoDB at {uri}...", flush=True)
+        # We wrap this in a wait to see if it's the specific line that hangs
         await app.mongodb_client.admin.command('ping')
-        print("✅ MongoDB Connected")
+        print("✅ DEBUG: MongoDB Connected Successfully", flush=True)
     except Exception as e:
-        print(f"❌ MongoDB Timeout: {e}")
-        # Setting this to None lets the rest of the app start even if DB is down
-        app.database = None
+        print(f"❌ DEBUG: MongoDB Connection failed: {e}", flush=True)
+        print("⚠️ DEBUG: Proceeding without DB to prevent Preflight hang...", flush=True)
 
     yield
-    app.mongodb_client.close()
+    print("🛑 DEBUG: Shutting down...", flush=True)
 
 app = FastAPI(title="HR Attrition Predictor API",lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"], # Allows any origin
+    allow_origins=["*"], # Allows any origin
     allow_credentials=True,
     allow_methods=["*"], # Allows POST, OPTIONS, GET, etc.
     allow_headers=["*"], # Allows Content-Type, Authorization, etc.
@@ -88,18 +102,11 @@ app.add_middleware(
 # For the history table
 @app.get("/api/get-history")
 async def get_history():
-    try:
-        cursor = app.database["reports"].find().sort("created_at", -1)
-        history = await cursor.to_list(length=100)
-
-        for doc in history:
-            doc["_id"] = str(doc["_id"])
-            if "created_at" not in doc:
-                doc["created_at"] = datetime.now(timezone.utc).isoformat()
-        return history
-    except Exception as e:
-        print(f"History Fetch Error: {e}")
-        return []
+    cursor = app.database["reports"].find().sort("created_at", -1)
+    history = await cursor.to_list(length=100)
+    for doc in history:
+        doc["_id"] = str(doc["_id"]) # Convert MongoDB ID to string
+    return history
 
 @app.delete("/api/delete-report/{report_id}")
 async def delete_report(report_id: str):
@@ -121,65 +128,194 @@ async def test_debug():
 # For Upload PDF feature
 import fitz  # PyMuPDF
 
+# @app.post("/api/upload-pdf")
+# async def upload_pdf(file: UploadFile = File(...)):
+#     print(f"🚀 Received file: {file.filename}")
+#
+#     extracted_data = {
+#         "Position": "Unknown",
+#         "Salary": 5000,
+#         "Age": 30,
+#         "Department": "Production",
+#         "Sex": 0,
+#     }
+#     temp_path = f"temp_{file.filename}"
+#     try:
+#         # Save temp file
+#         with open(temp_path, "wb") as buffer:
+#             shutil.copyfileobj(file.file, buffer)
+#
+#         # Extract text
+#         doc = fitz.open(temp_path)
+#         resume_text = "".join([page.get_text() for page in doc])
+#         doc.close()
+#
+#         # Call Gemini
+#         # Note: Ensure hr_system_instruction is defined globally with the 31 positions
+#         response = client.models.generate_content(
+#             model="gemini-1.5-flash",
+#             config={
+#                 "response_mime_type": "application/json",
+#                 "temperature": 0.0,
+#                 "top_p": 0.1,  # Limits the "randomness" pool
+#             },
+#             contents=[hr_system_instruction, f"Resume content: {resume_text}"]
+#         )
+#         # Robust Parsing Logic
+#         raw_json_text = response.text.strip()
+#         # Clean markdown if Gemini wrapped it in ```json
+#         if "```" in raw_json_text:
+#             raw_json_text = raw_json_text.split("```")[1].replace("json", "").strip()
+#             print(f"📡 RAW API RESPONSE: {raw_json_text}")
+#
+#         extracted_data = json.loads(raw_json_text)
+#         print(f"✅ Parsed Data: {extracted_data}")
+#
+#     except Exception as e:
+#         print(f"❌ Extraction Error: {e}")
+#         # extracted_data remains as the default initialized above
+#
+#     finally:
+#         if os.path.exists(temp_path):
+#             os.remove(temp_path)
+#
+#         return extracted_data
+
+#UPLOAD PDF
 @app.post("/api/upload-pdf")
 async def upload_pdf(file: UploadFile = File(...)):
-    print(f"🚀 Received file: {file.filename}")
+    print("\n" + "=" * 50)
+    print(f"🔍 STEP 1: Request received for {file.filename}")
 
-    # Initialize default data to prevent NameErrors
-    extracted_data = {
-        "Position": "Unknown",
-        "Salary": 5000,
-        "Age": 30,
-        "Department": "Production",
-        "Sex": 0,
-    }
-
+    # Defaults
+    final_result = {"Position": "Unknown", "Salary": 5000, "Age": 30, "Department": "Production", "Sex": 0}
     temp_path = f"temp_{file.filename}"
+
     try:
-        # Save temp file
+        # --- PDF EXTRACTION ---
         with open(temp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # Extract text
         doc = fitz.open(temp_path)
         resume_text = "".join([page.get_text() for page in doc])
         doc.close()
 
-        # Call Gemini
-        # Note: Ensure hr_system_instruction is defined globally with the 31 positions
+        if not resume_text.strip():
+            print("❌ ERROR: PDF text extraction resulted in an empty string!")
+            return final_result
+
+        print(f"✅ STEP 2: Text Extracted ({len(resume_text)} chars)")
+
+        # --- GEMINI API CHECK ---
+        print("📡 STEP 3: Attempting to contact Gemini API...")
+
+        # Check if API Key exists
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            print("❌ ERROR: GEMINI_API_KEY is missing from .env!")
+            return final_result
+
+        # Trigger the call
         response = client.models.generate_content(
-            model="gemini-1.5-flash",  # Use the stable model name for your tier
-            config={
-                "response_mime_type": "application/json",
-            },
+            model="gemini-2.5-flash-lite",
+            config={"response_mime_type": "application/json", "temperature": 0},
             contents=[hr_system_instruction, f"Resume content: {resume_text}"]
         )
 
-        # Robust Parsing Logic
-        raw_json_text = response.text.strip()
-        # Clean markdown if Gemini wrapped it in ```json
-        if "```" in raw_json_text:
-            raw_json_text = raw_json_text.split("```")[1].replace("json", "").strip()
+        # --- RESPONSE VALIDATION ---
+        if not response or not response.text:
+            print("❌ ERROR: Gemini returned an empty response.")
+            return final_result
 
-        extracted_data = json.loads(raw_json_text)
-        print(f"✅ Parsed Data: {extracted_data}")
+        raw_text = response.text.strip()
+        print(f"📥 STEP 4: Gemini Replied: {raw_text}")
+
+        ai_data = json.loads(raw_text)
+
+        # Aggressive mapping to ensure keys match your frontend
+        for key, value in ai_data.items():
+            norm_key = key.strip().capitalize()
+            if norm_key in final_result:
+                final_result[norm_key] = value
+                print(f"📌 Mapped: {norm_key} -> {value}")
+
+        print("🎯 STEP 5: Successfully processed all data.")
 
     except Exception as e:
-        print(f"❌ Extraction Error: {e}")
-        # extracted_data remains as the default initialized above
+        print(f"💥 CRITICAL FAILURE: {type(e).__name__} - {str(e)}")
+        # This will print the full traceback so we can see the line number
+        import traceback
+        traceback.print_exc()
 
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
-
-        return extracted_data
+        print("=" * 50 + "\n")
+        return final_result
 
 #SAVE REPORT
 @app.post("/api/save-report")
 async def save_report(payload: dict = Body(...)):
-    payload["created_at"] = datetime.now(timezone.utc)
-    new_report = await app.database["reports"].insert_one(payload)
-    return {"id": str(new_report.inserted_id), "status": "Success"}
+    # Safety check: ensures app.database exists
+    if not hasattr(app, "database") or app.database is None:
+        print("❌ DB Error: Database object not found on app")
+        raise HTTPException(status_code=503, detail="Database not initialized")
+
+    try:
+        payload["created_at"] = datetime.now(timezone.utc)
+        new_report = await app.database["reports"].insert_one(payload)
+        return {"id": str(new_report.inserted_id), "status": "Success"}
+    except Exception as e:
+        print(f"❌ DB Save Error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save report")
+
+# DASHBOARD STATS
+
+'''
+*--------------------*
+$match, $group are MongoDB Operators
+The pipeline is a list w/ stages that happen one after another
+1. "$match": {"prediction": "High Risk"} --> Filters
+2. "$group": {"_id": "$Department", "count": {"$sum": 1} --> Categorize & Count
+3. "$sort": {"count": -1} --> Sorts by the count. The -1 means descending
+4. "$limit": 1 --> Selects the first item (which would have the highest risk)
+*--------------------*
+'''
+
+@app.get("/api/dashboard-stats")
+async def get_stats():
+    try:
+        total = await app.database["reports"].count_documents({})
+
+        high_risk = await app.database["reports"].count_documents({"prediction": "High Risk"})
+
+        avg_pipeline = [{"$group": {"_id": None, "avg_risk": {"$avg": "$attrition_risk_percent"}}}]
+        avg_cursor = app.database["reports"].aggregate(avg_pipeline)
+        avg_result = await avg_cursor.to_list(length=1)
+        avg_risk_val = avg_result[0]["avg_risk"] if avg_result else 0
+
+        dept_pipeline = [
+            {"$match": {"prediction": "High Risk"}},
+            {"$group": {"_id": "$Department", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}},
+            {"$limit": 1}
+        ]
+        #.aggregate() sends the pipeline list to the MongoDB server/reports collection
+        #dept_cursor is now a pointer to the data in server, its just a connection NOT data
+        dept_cursor = app.database["reports"].aggregate(dept_pipeline)
+        #here, cursor fetches data from db and is then converted to list
+        dept_result = await dept_cursor.to_list(length=1)
+        top_dept = dept_result[0]["_id"] if dept_result else "N/A"
+
+        return {
+            "total": total,
+            "highRisk": high_risk,
+            "avgRisk": f"{round(avg_risk_val * 100)}%",
+            "topDept": top_dept  # Fixed: using the dynamic variable now
+        }
+    except Exception as e:
+        print(f"❌ Stats Error: {e}")
+        return {"total": 0, "highRisk": 0, "avgRisk": "0%", "topDept": "N/A"}
 
 try:
     model = joblib.load('attrition_model.pkl')
@@ -202,48 +338,38 @@ class Employee(BaseModel):
     RecruitmentSource: str
     PerformanceScore: str
 
-@app.post("/predictor")
-async def predict(emp: Employee):
-    print("--- NEW PREDICTION REQUEST ---")
-    try:
-        data = emp.model_dump() # Turns the input into a dictionary
+@app.api_route("/predictor", methods=["POST", "OPTIONS"])
+async def predictor(req: Request, emp: Employee | None = None):
 
-        #Handling str data
-        dept = str(data.pop('Department', '')).strip()
-        pos = str(data.pop('Position', '')).strip()
-        rec = str(data.pop('RecruitmentSource', '')).strip()
-        perf = str(data.pop('PerformanceScore', '')).strip()
+    # 👇 Handle preflight instantly (NO validation error)
+    if req.method == "OPTIONS":
+        return {}
 
-        df = pd.DataFrame([data]) #Puts the remaining data values that are numbers into a table
+    # 👇 Make sure POST has a valid body
+    if emp is None:
+        raise HTTPException(status_code=400, detail="Missing request body")
 
-        df[f"Department_{dept}"] = 1
-        df[f"Position_{pos}"] = 1
-        df[f"RecruitmentSource_{rec}"] = 1
-        df[f"PerformanceScore_{perf}"] = 1
+    # ---- Your prediction code ----
+    data = emp.model_dump()
+    dept = data.pop('Department')
+    pos = data.pop('Position')
+    rec = data.pop('RecruitmentSource')
+    perf = data.pop('PerformanceScore')
 
-        #Reindex looks at model_columns, adds all the missing columns (like Position_CEO), and fills them with 0.
-        #Also, puts it in order that XGBoost requires.
-        df = df.reindex(columns=model_columns, fill_value=0)
+    df = pd.DataFrame([data])
+    df[f"Department_{dept}"] = 1
+    df[f"Position_{pos}"] = 1
+    df[f"RecruitmentSource_{rec}"] = 1
+    df[f"PerformanceScore_{perf}"] = 1
 
-        #Remove any accidentally duplicated columns
-        df = df.loc[:, ~df.columns.duplicated()].copy()
+    df = df.reindex(columns=model_columns, fill_value=0)
+    df = df.loc[:, ~df.columns.duplicated()].copy()
+    X = df.values.astype(np.float32)
 
-        X = df.values.astype(np.float32)
+    prob = float(model.predict_proba(X)[0][1])
 
-        # What is the probability this per  son leaves (Class 1)
-        # The model returns a 2D list: [[prob_stay, prob_leave]]
-        # [0] accesses the first row (a single employee)--> [prob_stay, prob_leave] -> Removes the nested array
-        # [1] accesses the second value (the probability of leaving) [prob_leave]
-        prob_matrix = model.predict_proba(X)
-        prob = float(prob_matrix[0][1])
-
-
-        return {
-            "attrition_risk_percent": round(float(prob) * 100, 2),
-            "prediction": "High Risk" if prob > 0.5 else "Low Risk",
-            "status": "Success"
-        }
-
-    except Exception as e:
-        print(f"CRITICAL ERROR: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
+    return {
+        "attrition_risk_percent": round(prob * 100, 2),
+        "prediction": "High Risk" if prob > 0.5 else "Low Risk",
+        "status": "Success"
+    }
