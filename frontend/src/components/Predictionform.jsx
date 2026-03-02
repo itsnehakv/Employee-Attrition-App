@@ -107,6 +107,9 @@ const Predictionform = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (loading) return; // If already loading, prevent multiple submissions
+
     setLoading(true);
 
     // To ensure datatype is as required by backend/model
@@ -132,32 +135,27 @@ const Predictionform = ({
         body: JSON.stringify(payload),
       });
 
-      if (!response.ok) throw new Error("Network response was not ok");
+      if (!response.ok) throw new Error("Prediction failed");
 
       const data = await response.json();
 
       const fullReport = {
         ...data, // Includes prediction and risk percent
         input_data: payload, // Attach the inputs so they can be displayed in the reports dashboard
+        timestamp: new Date().toISOString(),
       };
 
       console.log("Saving to Global State:", fullReport);
 
       // Update local and global state
       setPrediction(fullReport);
-      if (setGlobalPrediction) {
-        setGlobalPrediction(fullReport);
-      }
+      setGlobalPrediction?.(fullReport);
 
       const dbResponse = await fetch("http://127.0.0.1:8000/api/save-report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(fullReport),
       });
-
-      if (dbResponse.ok) {
-        console.log("✅ Report saved to Database");
-      }
 
       if (dbResponse.ok) {
         console.log("✅ Report saved to Database");
@@ -172,6 +170,7 @@ const Predictionform = ({
   /*------------------------------------------------------------------------------------------------*/
   // UPLOAD PDF
   const handleFileUpload = async (e) => {
+    if (isUploading) return;
     const file = e.target.files[0];
     if (!file) return;
 
@@ -203,22 +202,51 @@ const Predictionform = ({
       const extractedData = await response.json();
       console.log("✅ Data extracted successfully:", extractedData);
 
+      const normalizedData = {
+        Position: extractedData.Position || extractedData.position,
+        Department: extractedData.Department || extractedData.department,
+        Salary: extractedData.Salary || extractedData.salary,
+        Age: extractedData.Age || extractedData.age,
+        Sex:
+          extractedData.Sex !== undefined
+            ? extractedData.Sex
+            : extractedData.sex,
+      };
+
+      // 1. Safety Guard: If extractedData is null/undefined, stop here.
+      if (!normalizedData) {
+        console.error("❌ Backend returned empty data");
+        return;
+      }
+      console.log("Type of data:", typeof normalizedData);
+      console.log("Keys in data:", Object.keys(normalizedData || {}));
+      // 2. Safe State Update
       setFormData((prev) => ({
         ...prev,
-        ...extractedData,
+        // Using ?. (Optional Chaining) ensures it won't crash even if nested
+        Salary: normalizedData?.Salary ?? prev.Salary,
+        Age: normalizedData?.Age ?? prev.Age,
+        Department: normalizedData?.Department ?? prev.Department,
+        Position: normalizedData?.Position ?? prev.Position,
+        Sex: normalizedData?.Sex ?? prev.Sex,
       }));
 
-      if (extractedData.Position) {
-        setPosQuery(extractedData.Position);
+      if (normalizedData?.Position) {
+        setPosQuery(normalizedData.Position);
       }
     } catch (error) {
       console.error("❌ PDF Upload Error:", error);
-      alert(
-        "Upload failed! Check if FastAPI is running and look at the terminal for errors."
-      );
+      // Check if it's the rate limit (429)
+      if (error.message.includes("429")) {
+        alert(
+          "Gemini API Rate Limit hit! Please wait 60 seconds and try again."
+        );
+      } else {
+        alert(`Upload failed: ${error.message}`);
+      }
     } finally {
-      console.log("🏁 Upload process finished.");
-      setIsUploading(false); // This STOPS the loading state
+      setIsUploading(false);
+      console.log("🏁 Loading state cleared.");
     }
   };
 
@@ -505,13 +533,7 @@ const Predictionform = ({
             >
               Fully Meets
             </option>
-            <option
-              value="Exceeds"
-              className="
-            bg-slate-900"
-            >
-              Exceeds
-            </option>
+
             <option
               value="Needs Improvement"
               className="
