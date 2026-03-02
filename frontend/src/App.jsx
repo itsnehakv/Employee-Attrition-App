@@ -4,6 +4,7 @@ import Navbar from "./components/Navbar";
 import Predictionform from "./components/Predictionform";
 import { useState } from "react";
 import ReportsDashboard from "./components/ReportsDashboard";
+import Dashboard from "./components/Dashboard";
 
 function App() {
   const [globalPrediction, setGlobalPrediction] = useState(null);
@@ -42,6 +43,8 @@ function App() {
               </div>
             }
           />
+          {/* DASHBOARD */}
+          <Route path="/dashboard" element={<Dashboard />} />
           {/* PREDICTOR VIEW */}
           <Route
             path="/predictor"
@@ -51,7 +54,7 @@ function App() {
                 setGlobalPrediction={setPrediction}
               />
             }
-          />{" "}
+          />
           {/* REPORTS */}
           <Route
             path="/reports"
