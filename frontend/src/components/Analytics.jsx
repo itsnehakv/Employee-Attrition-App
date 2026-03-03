@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { BarChart3, PieChart, Activity, ShieldAlert } from "lucide-react";
 import StatCards from "../components/StatCards";
 import DeptRiskChart from "../components/DeptRiskChart";
+import RiskDistChart from "../components/RiskDistChart";
+import AttritionDrivers from "./AttritionDrivers";
 
 const Analytics = () => {
   const [data, setData] = useState(null);
@@ -28,7 +30,7 @@ const Analytics = () => {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-10">
-          <h1 className="text-4xl font-black text-white tracking-tight mb-2">
+          <h1 className="text-3xl font-black text-white tracking-tight mb-2">
             Predictive <span className="text-blue-500">Analytics</span>
           </h1>
           <p className="text-slate-500">
@@ -61,21 +63,23 @@ const Analytics = () => {
           />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           {/* Department Heatmap */}
           <DeptRiskChart data={data.departments} />
 
-          {/* Feature Importance (Placeholder fo r now) */}
-          <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-8 backdrop-blur-md">
-            <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
-              <PieChart className="text-blue-500" size={20} />
-              Global Feature Importance
-            </h3>
-            <div className="space-y-4">
-              <div className="p-10 border-2 border-dashed border-slate-800 rounded-2xl text-center text-slate-600 italic">
-                Model Feature Weights here
-              </div>
-            </div>
+          {/* Risk Distribution Doughnut CHart */}
+          <RiskDistChart dist={data.distribution} />
+        </div>
+
+        {/* Attrition Drivers Section */}
+        <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-8 backdrop-blur-md">
+          <h3 className="text-lg font-bold mb-6 flex items-center gap-2 text-white">
+            <PieChart className="text-blue-500" size={20} />
+            Attrition Drivers
+          </h3>
+
+          <div className="space-y-4">
+            <AttritionDrivers features={data.features} />
           </div>
         </div>
       </div>
