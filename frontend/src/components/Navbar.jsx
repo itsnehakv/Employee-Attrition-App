@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
+import { Github } from "lucide-react";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -41,6 +42,15 @@ const Navbar = () => {
 
       {/* Desktop Buttons */}
       <div className="hidden ml-auto md:flex items-center gap-4">
+        <a
+          href="https://github.com/itsnehakv/Employee-Attrition-App.git"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800/50 hover:bg-slate-700 transition-colors border border-slate-700 text-sm font-medium"
+        >
+          <Github size={18} />
+          <span>Visit Repo</span>
+        </a>
         <a
           href="https://www.linkedin.com/in/nehakvallappil"
           target="_blank"

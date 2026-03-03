@@ -30,8 +30,8 @@ const Dashboard = () => {
         {/* Header Section */}
         <div className="flex justify-between items-end mb-10">
           <div>
-            <h1 className="text-3xl font-bold text-blue-400 mb-2">
-              Retention Overview
+            <h1 className="text-3xl font-black text-white tracking-tight mb-2">
+              Retention <span className="text-blue-500">Overview</span>
             </h1>
             <p className="text-slate-500 text-sm font-medium tracking-wide italic">
               Monitoring Attrition Probability Vectors
