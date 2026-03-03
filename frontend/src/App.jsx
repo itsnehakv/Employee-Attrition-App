@@ -5,6 +5,7 @@ import Predictionform from "./components/Predictionform";
 import { useState } from "react";
 import ReportsDashboard from "./components/ReportsDashboard";
 import Dashboard from "./components/Dashboard";
+import Analytics from "./components/Analytics";
 
 function App() {
   const [globalPrediction, setGlobalPrediction] = useState(null);
@@ -60,6 +61,9 @@ function App() {
             path="/reports"
             element={<ReportsDashboard prediction={globalPrediction} />}
           />
+
+          {/* ANALYTICS */}
+          <Route path="/analytics" element={<Analytics />} />
         </Routes>
       </main>
     </div>

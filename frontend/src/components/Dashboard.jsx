@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
 import StatCards from "../components/StatCards";
 import { Users, AlertCircle, TrendingUp, Zap } from "lucide-react";
+import HistoryTable from "./HistoryTable";
 
 const Dashboard = () => {
+  const [history, setHistory] = useState([]);
   const [stats, setStats] = useState({
     total: 0,
     highRisk: 0,
@@ -15,6 +17,11 @@ const Dashboard = () => {
       .then((res) => res.json())
       .then((data) => setStats(data))
       .catch((err) => console.error("Stats Fetch Error:", err));
+
+    fetch("http://127.0.0.1:8000/api/get-history")
+      .then((res) => res.json())
+      .then((data) => setHistory(data))
+      .catch((err) => console.error("History Fetch Error:", err));
   }, []);
 
   return (
@@ -64,14 +71,13 @@ const Dashboard = () => {
             colorClass="text-purple-400"
           />
         </div>
-
-        {/* Placeholder for History Table */}
+        {/* History Table */}
         <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-700 rounded-3xl p-8 shadow-2xl">
           <h2 className="text-xl font-bold text-white mb-6">
             Recent Prediction Log
           </h2>
-          <div className="text-slate-500 text-center py-20 border-2 border-dashed border-slate-800 rounded-2xl italic">
-            Ready to implement History Table here...
+          <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-700 rounded-3xl p-8 shadow-2xl">
+            <HistoryTable history={history} setHistory={setHistory} />
           </div>
         </div>
       </div>
