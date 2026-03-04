@@ -18,6 +18,12 @@ import json
 #*-----------------------------*
 from fastapi import UploadFile, File
 import shutil
+#*-----------------------------*
+#For Download CSV
+#*-----------------------------*
+import csv
+import io
+from fastapi.responses import StreamingResponse
 
 load_dotenv()
 
@@ -65,11 +71,9 @@ STRICT RULES:
 #*------------------------------*
 
 async def lifespan(app: FastAPI):
-    print("🚀 DEBUG: Entering Lifespan...", flush=True)
     uri = os.getenv("MONGO_URI")
 
-    # serverSelectionTimeoutMS=2000 is CRITICAL.
-    # Without it, Motor hangs forever if the URI is wrong or DB is down.
+    # serverSelectionTimeoutMS=2000 prevents Motor from hanging forever if URI is wrong or DB is down
     app.mongodb_client = AsyncIOMotorClient(
         uri,
         serverSelectionTimeoutMS=2000,
@@ -78,16 +82,11 @@ async def lifespan(app: FastAPI):
     app.database = app.mongodb_client.employee_attrition_db
 
     try:
-        print(f"🔗 DEBUG: Pinging MongoDB at {uri}...", flush=True)
-        # We wrap this in a wait to see if it's the specific line that hangs
         await app.mongodb_client.admin.command('ping')
-        print("✅ DEBUG: MongoDB Connected Successfully", flush=True)
     except Exception as e:
-        print(f"❌ DEBUG: MongoDB Connection failed: {e}", flush=True)
-        print("⚠️ DEBUG: Proceeding without DB to prevent Preflight hang...", flush=True)
+        print(f"❌ MongoDB Connection failed: {e}", flush=True)
 
     yield
-    print("🛑 DEBUG: Shutting down...", flush=True)
 
 app = FastAPI(title="HR Attrition Predictor API",lifespan=lifespan)
 
@@ -99,117 +98,9 @@ app.add_middleware(
     allow_headers=["*"], # Allows Content-Type, Authorization, etc.
 )
 
-# For the history table
-@app.get("/api/get-history")
-async def get_history():
-    cursor = app.database["reports"].find().sort("created_at", -1)
-    history = await cursor.to_list(length=100)
-    for doc in history:
-        doc["_id"] = str(doc["_id"]) # Convert MongoDB ID to string
-    return history
-
-@app.delete("/api/delete-report/{report_id}")
-async def delete_report(report_id: str):
-    try:
-        # Convert the string ID back into a MongoDB ObjectId
-        result = await app.database["reports"].delete_one({"_id": ObjectId(report_id)})
-        if result.deleted_count == 1:
-            return {"message": "Successfully deleted"}
-        return {"message": "Report not found"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail="Invalid ID format")
-
-#----------------------------------------------------------------------------------------------------
-# For Upload PDF feature
-import fitz  # PyMuPDF
-@app.post("/api/upload-pdf")
-async def upload_pdf(file: UploadFile = File(...)):
-    print("\n" + "=" * 50)
-    print(f"🔍 STEP 1: Request received for {file.filename}")
-
-    # Defaults
-    final_result = {"Position": "Unknown", "Salary": 5000, "Age": 30, "Department": "Production", "Sex": 0}
-    temp_path = f"temp_{file.filename}"
-
-    try:
-        # --- PDF EXTRACTION ---
-        with open(temp_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        doc = fitz.open(temp_path)
-        resume_text = "".join([page.get_text() for page in doc])
-        doc.close()
-
-        if not resume_text.strip():
-            print("❌ ERROR: PDF text extraction resulted in an empty string!")
-            return final_result
-
-        print(f"✅ STEP 2: Text Extracted ({len(resume_text)} chars)")
-
-        # --- GEMINI API CHECK ---
-        print("📡 STEP 3: Attempting to contact Gemini API...")
-
-        # Check if API Key exists
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            print("❌ ERROR: GEMINI_API_KEY is missing from .env!")
-            return final_result
-
-        # Trigger the call
-        response = client.models.generate_content(
-            model="gemini-2.5-flash-lite",
-            config={"response_mime_type": "application/json", "temperature": 0},
-            contents=[hr_system_instruction, f"Resume content: {resume_text}"]
-        )
-
-        # --- RESPONSE VALIDATION ---
-        if not response or not response.text:
-            print("❌ ERROR: Gemini returned an empty response.")
-            return final_result
-
-        raw_text = response.text.strip()
-        print(f"📥 STEP 4: Gemini Replied: {raw_text}")
-
-        ai_data = json.loads(raw_text)
-
-        for key, value in ai_data.items():
-            norm_key = key.strip().capitalize()
-            if norm_key in final_result:
-                final_result[norm_key] = value
-                print(f"📌 Mapped: {norm_key} -> {value}")
-
-        print("🎯 STEP 5: Successfully processed all data.")
-
-    except Exception as e:
-        print(f"💥 CRITICAL FAILURE: {type(e).__name__} - {str(e)}")
-        # This will print the full traceback so we can see the line number
-        import traceback
-        traceback.print_exc()
-
-    finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-        print("=" * 50 + "\n")
-        return final_result
-
-#SAVE REPORT
-@app.post("/api/save-report")
-async def save_report(payload: dict = Body(...)):
-    # Safety check: ensures app.database exists
-    if not hasattr(app, "database") or app.database is None:
-        print("❌ DB Error: Database object not found on app")
-        raise HTTPException(status_code=503, detail="Database not initialized")
-
-    try:
-        payload["created_at"] = datetime.now(timezone.utc)
-        new_report = await app.database["reports"].insert_one(payload)
-        return {"id": str(new_report.inserted_id), "status": "Success"}
-    except Exception as e:
-        print(f"❌ DB Save Error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to save report")
-
-
-# DASHBOARD STATS
+#DASHBOARD
+#*---------------------*
+# STATS for stat cards
 '''
 *--------------------*
 $match, $group are MongoDB Operators
@@ -256,15 +147,121 @@ async def get_stats():
             "topDept": top_dept
         }
     except Exception as e:
-        print(f"❌ Stats Error: {e}")
         return {"total": 0, "highRisk": 0, "avgRisk": "0%", "topDept": "N/A"}
+
+#HISTORY TABLE
+@app.get("/api/get-history")
+async def get_history():
+    try:
+        # -1 means most recent first
+        cursor = app.database["reports"].find().sort("created_at", -1)
+
+        history = await cursor.to_list(length=5)
+
+        for doc in history:
+            doc["_id"] = str(doc["_id"])
+            # If attrition_risk_percent gets stored as string, forcefully convert to float
+            doc["attrition_risk_percent"] = float(doc.get("attrition_risk_percent", 0))
+
+        return history
+    except Exception as e:
+        print(f"History Fetch Error: {e}")
+        return []
+
+#DELETE RECORD
+@app.delete("/api/delete-report/{report_id}")
+async def delete_report(report_id: str):
+    try:
+        # Convert the string ID back into a MongoDB ObjectId
+        result = await app.database["reports"].delete_one({"_id": ObjectId(report_id)})
+        if result.deleted_count == 1:
+            return {"message": "Successfully deleted"}
+        return {"message": "Report not found"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Invalid ID format")
+
+
+#PREDICTOR
+#----------------------------------------------------------------------------------------------------
+# Upload PDF / PDF EXTRACTOR
+import fitz  # PyMuPDF
+@app.post("/api/upload-pdf")
+async def upload_pdf(file: UploadFile = File(...)):
+    # Defaults
+    final_result = {"Position": "Unknown", "Salary": 5000, "Age": 30, "Department": "Production", "Sex": 0}
+    temp_path = f"temp_{file.filename}"
+
+    try:
+        # EXTRACTION
+        with open(temp_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        doc = fitz.open(temp_path)
+        resume_text = "".join([page.get_text() for page in doc])
+        doc.close()
+
+        if not resume_text.strip():
+            return final_result
+
+        # Check if API Key exists
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            return final_result
+
+        # Trigger the call
+        response = client.models.generate_content(
+            model="gemini-2.5-flash-lite",
+            config={"response_mime_type": "application/json", "temperature": 0},
+            contents=[hr_system_instruction, f"Resume content: {resume_text}"]
+        )
+
+        # RESPONSE VALIDATION
+        if not response or not response.text:
+            return final_result
+
+        raw_text = response.text.strip()
+
+        ai_data = json.loads(raw_text)
+
+        for key, value in ai_data.items():
+            norm_key = key.strip().capitalize()
+            if norm_key in final_result:
+                final_result[norm_key] = value
+
+    except Exception as e:
+        print(f"💥 CRITICAL FAILURE: {type(e).__name__} - {str(e)}")
+        # prints the full traceback so we can see the line number
+        import traceback
+        traceback.print_exc()
+
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        print("=" * 50 + "\n")
+        return final_result
+
+#SAVE REPORT
+@app.post("/api/save-report")
+async def save_report(payload: dict = Body(...)):
+    # Safety check: ensures app.database exists
+    if not hasattr(app, "database") or app.database is None:
+        raise HTTPException(status_code=503, detail="Database not initialized")
+
+    try:
+        payload["created_at"] = datetime.now(timezone.utc)
+        new_report = await app.database["reports"].insert_one(payload)
+        return {"id": str(new_report.inserted_id), "status": "Success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to save report")
+
 
 try:
     model = joblib.load('attrition_model.pkl')
     model_columns = joblib.load('model_columns.pkl')
 
 except Exception as e:
-    print(f"❌ Backend Critical Error: {e}")
+    print(f"CRITICAL: Failed to load ML models: {e}", file=sys.stderr)
+    sys.exit(1) # stops server
 
 class Employee(BaseModel):
     Salary: float
@@ -283,7 +280,15 @@ class Employee(BaseModel):
 @app.api_route("/predictor", methods=["POST", "OPTIONS"])
 async def predictor(req: Request, emp: Employee | None = None):
 
-    # 👇 Handle preflight instantly (NO validation error)
+    '''
+    Handles CORS preflight requests
+    Browser sends an OPTIONS request to verify server permissions before the actual POST.
+    Browsers have a security policy that prevents a port from making reqs. to diff. ports unless the server explicitly gives permission.
+    FastAPI expect an Employee object.
+    Since the OPTIONS req. is empty, FastAPI's validation would normally fail & return an error.
+    This block of code catches the OPTIONS method and returns empty dictionary {}.
+    It sends a 200 OK status back to the browser.
+'''
     if req.method == "OPTIONS":
         return {}
 
@@ -302,8 +307,8 @@ async def predictor(req: Request, emp: Employee | None = None):
     df[f"RecruitmentSource_{rec}"] = 1
     df[f"PerformanceScore_{perf}"] = 1
 
+    # Dataset has a weirdly spaced column name for Department Production
     if dept == "Production":
-        # Dataset has a weirdly spaced column name for Department Production
         df["Department_Production       "] = 1
 
     df = df.reindex(columns=model_columns, fill_value=0)
@@ -316,4 +321,96 @@ async def predictor(req: Request, emp: Employee | None = None):
         "attrition_risk_percent": round(prob * 100, 2),
         "prediction": "High Risk" if prob > 0.5 else "Low Risk",
         "status": "Success"
+    }
+
+#REPORTS
+#*----------------------*
+@app.get("/api/reports/download-csv")
+async def download_csv():
+    #  Fetch all documents from reports collection
+    cursor = app.database["reports"].find({})
+    reports = await cursor.to_list(length=1000)
+
+    # Create the CSV structure in memory
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow([
+        "Date", "Department", "Position", "Salary", "Age",
+        "Engagement", "Satisfaction", "Absences", "Risk %", "Status"
+    ])
+
+    for r in reports:
+        inp = r.get("input_data", {})
+
+        risk = r.get("attrition_risk_percent", 0)
+        status = "HIGH RISK" if risk > 50 else "STABLE"
+
+        writer.writerow([
+            r.get("timestamp", "N/A"),
+            inp.get("Department", "N/A"),
+            inp.get("Position", "N/A"),
+            inp.get("Salary", 0),
+            inp.get("Age", 0),
+            inp.get("EngagementSurvey", 0),
+            inp.get("EmpSatisfaction", 0),
+            inp.get("Absences", 0),
+            f"{risk}%",
+            status
+        ])
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=attrition_audit_log.csv"}
+    )
+
+#ANALYTICS
+#*-----------------------*
+#DEPARTMENTAL RISK
+@app.get("/api/analytics/summary")
+async def get_analytics_summary():
+    # Department Risk Aggregation
+    dept_pipeline = [
+        {"$group": {
+            "_id": "$input_data.Department",
+            "avg_risk": {"$avg": "$attrition_risk_percent"},
+            "count": {"$sum": 1}
+        }},
+        {"$sort": {"avg_risk": -1}}
+    ]
+
+    # Risk Distribution Pie Chart
+    dist_pipeline = [
+        {"$project": {
+            "level": {
+                "$cond": [
+                    {"$gte": ["$attrition_risk_percent", 70]}, "High",
+                    {"$cond": [{"$gte": ["$attrition_risk_percent", 30]}, "Medium", "Low"]}
+                ]
+            }
+        }},
+        {"$group": {"_id": "$level", "count": {"$sum": 1}}}
+    ]
+
+    depts = await app.database["reports"].aggregate(dept_pipeline).to_list(100)
+    dist = await app.database["reports"].aggregate(dist_pipeline).to_list(100)
+
+    #Attrition Drivers (or) Feature Importance
+    features = [
+        {"feature": "Google Search Source", "importance": 0.081},
+        {"feature": "Software Engineer Role", "importance": 0.058},
+        {"feature": "Diversity Job Fair", "importance": 0.050},
+        {"feature": "Production Dept", "importance": 0.049},
+        {"feature": "Project Count", "importance": 0.048},
+        {"feature": "LinkedIn Source", "importance": 0.042},
+        {"feature": "Lateness (Last 30 Days)", "importance": 0.042},
+        {"feature": "Indeed Source", "importance": 0.041}
+    ]
+
+    return {
+        "departments": [{"name": d["_id"], "risk": round(d["avg_risk"], 1), "count": d["count"]} for d in depts],
+        "distribution": {d["_id"]: d["count"] for d in dist},
+        "features": features
     }
