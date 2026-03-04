@@ -67,7 +67,7 @@ const Analytics = () => {
           {/* Department Heatmap */}
           <DeptRiskChart data={data.departments} />
 
-          {/* Risk Distribution Doughnut CHart */}
+          {/* Risk Distribution Doughnut Chart */}
           <RiskDistChart dist={data.distribution} />
         </div>
 
