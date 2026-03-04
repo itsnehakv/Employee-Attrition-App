@@ -202,7 +202,7 @@ const ReportsDashboard = ({ globalPrediction }) => {
             Model Confidence
           </h4>
           <div className="flex items-end gap-2">
-            <span className="text-5xl font-bold text-white">94.8</span>
+            <span className="text-5xl font-bold text-white">70</span>
             <span className="text-blue-500 mb-2 font-bold">%</span>
           </div>
           <p className="text-[10px] text-slate-600 mt-4 uppercase font-bold tracking-wider">
