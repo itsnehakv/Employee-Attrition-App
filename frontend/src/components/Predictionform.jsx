@@ -36,8 +36,10 @@ const POSITIONS = [
   "CIO",
 ];
 
-/* setGlobalPrediction is passed down from App.jsx to allow the Predictionform to update the global state with 
-the latest prediction, which is then accessed by the ReportsDashboard to display data */
+/* 
+- setGlobalPrediction is passed down from App.jsx to allow the Predictionform to update the global state with 
+  the latest prediction, which is then accessed by the ReportsDashboard to display data
+ */
 const Predictionform = ({
   prediction: globalPrediction,
   setGlobalPrediction,
@@ -145,8 +147,6 @@ const Predictionform = ({
         timestamp: new Date().toISOString(),
       };
 
-      console.log("Saving to Global State:", fullReport);
-
       // Update local and global state
       setPrediction(fullReport);
       setGlobalPrediction?.(fullReport);
@@ -156,10 +156,6 @@ const Predictionform = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(fullReport),
       });
-
-      if (dbResponse.ok) {
-        console.log("✅ Report saved to Database");
-      }
     } catch (error) {
       console.error("Submission Error:", error);
     } finally {
@@ -174,7 +170,6 @@ const Predictionform = ({
     const file = e.target.files[0];
     if (!file) return;
 
-    console.log("🚀 Starting upload for:", file.name);
     setIsUploading(true);
 
     const uploadData = new FormData();
@@ -192,15 +187,12 @@ const Predictionform = ({
 
       clearTimeout(timeoutId);
 
-      console.log("📡 Response status:", response.status);
-
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Server Error: ${errorText}`);
       }
 
       const extractedData = await response.json();
-      console.log("✅ Data extracted successfully:", extractedData);
 
       const normalizedData = {
         Position: extractedData.Position || extractedData.position,
@@ -213,17 +205,24 @@ const Predictionform = ({
             : extractedData.sex,
       };
 
-      // 1. Safety Guard: If extractedData is null/undefined, stop here.
+      // If extractedData is null/undefined, stop here.
       if (!normalizedData) {
-        console.error("❌ Backend returned empty data");
+        alert(
+          "AI was unable to extract data from this PDF. Please fill the form manually."
+        );
         return;
       }
-      console.log("Type of data:", typeof normalizedData);
-      console.log("Keys in data:", Object.keys(normalizedData || {}));
-      // 2. Safe State Update
+
+      {
+        /*  
+        - Using ?. (Optional Chaining) ensures it won't crash.
+        - (Value to try) ?? (Backup value)
+        - If normalzizedData exists, check if its Salary key exists and is not null/undefined, then use it. 
+        - If the PDF doesn't have Salary, keep the Salary that was already in the form
+        */
+      }
       setFormData((prev) => ({
         ...prev,
-        // Using ?. (Optional Chaining) ensures it won't crash even if nested
         Salary: normalizedData?.Salary ?? prev.Salary,
         Age: normalizedData?.Age ?? prev.Age,
         Department: normalizedData?.Department ?? prev.Department,
@@ -236,6 +235,7 @@ const Predictionform = ({
       }
     } catch (error) {
       console.error("❌ PDF Upload Error:", error);
+
       // Check if it's the rate limit (429)
       if (error.message.includes("429")) {
         alert(
@@ -246,7 +246,6 @@ const Predictionform = ({
       }
     } finally {
       setIsUploading(false);
-      console.log("🏁 Loading state cleared.");
     }
   };
 
@@ -702,7 +701,7 @@ const Predictionform = ({
               riskLevel={prediction.prediction}
             />
 
-            {/* Actionable Button to go to the full Reports page */}
+            {/* Button to go to Reports Dashboard */}
             <button
               className="mt-8 text-blue-400 hover:text-blue-300 text-sm font-s emibold underline underline-offset-4"
               onClick={() => {
