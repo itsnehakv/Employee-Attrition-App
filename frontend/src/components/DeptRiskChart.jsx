@@ -18,11 +18,11 @@ const DeptRiskChart = ({ data }) => {
             <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
               <div
                 className={`h-full transition-all duration-1000 ease-out rounded-full ${
-                  dept.risk > 60
-                    ? "bg-red-500"
-                    : dept.risk > 30
+                  dept.risk > 50
+                    ? "bg-[#C71111]"
+                    : dept.risk > 25
                     ? "bg-yellow-500"
-                    : "bg-emerald-500"
+                    : "bg-[#088908]"
                 }`}
                 style={{ width: `${dept.risk}%` }}
               />
