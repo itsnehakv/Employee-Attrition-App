@@ -6,15 +6,12 @@ import {
   SquareUserRound,
   CalendarX2,
   Smile,
+  Download,
 } from "lucide-react";
 
 const ReportsDashboard = ({ globalPrediction }) => {
   const location = useLocation();
   const navigate = useNavigate();
-
-  // DEBUGGING
-  console.log("Suitcase Data:", location.state?.prediction);
-  console.log("Vault Prop Data:", globalPrediction);
 
   const displayData = location.state?.prediction || globalPrediction;
 
@@ -57,13 +54,13 @@ const ReportsDashboard = ({ globalPrediction }) => {
             </h3>
 
             <p className="text-slate-500 leading-relaxed">
-              Please run an assessment in the{" "}
+              Please run an assessment in the
               <strong className="text-slate-300">Predictor</strong> tab to
               generate this analysis.
             </p>
 
             <button
-              onClick={() => navigate("/")}
+              onClick={() => navigate("/predictor")}
               className="mt-8 px-8 py-3 bg-blue-600/10 hover:bg-blue-600 text-blue-500 hover:text-white border border-blue-600/30 rounded-2xl transition-all duration-300 font-bold"
             >
               Go to Predictor
@@ -100,14 +97,14 @@ const ReportsDashboard = ({ globalPrediction }) => {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-1000">
-      {/* Back button using navigate */}
+      {/* Back to predictor button */}
       <button
         onClick={() => navigate(-1)}
         className="group flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
       >
         <span className="group-hover:-translate-x-1 transition-transform">
           ←
-        </span>{" "}
+        </span>
         Back to Predictor
       </button>
 
@@ -122,12 +119,23 @@ const ReportsDashboard = ({ globalPrediction }) => {
           </p>
         </div>
         <div className="text-right">
-          <p className="text-xs font-mono text-slate-500 uppercase tracking-widest text-blue-500">
+          <p className="text-xs font-mono text-slate-500 uppercase tracking-widest">
             Analysis Complete
           </p>
           <p className="text-white font-bold">XGBOOST-V2.4.RC</p>
         </div>
       </div>
+      <button
+        onClick={() =>
+          (window.location.href =
+            "http://localhost:8000/api/reports/download-csv")
+        }
+        className="flex items-center gap-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-6 py-2.5 rounded-2xl transition-all font-bold text-xs uppercase tracking-widest"
+      >
+        <Download size={16} />
+        Export CSV
+      </button>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {stats.map((stat, index) => (
           <div
@@ -149,7 +157,7 @@ const ReportsDashboard = ({ globalPrediction }) => {
       <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Risk Driver Analysis */}
         <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-3xl">
-          <h4 className="text-slate-500 text-xs font-bold uppercase mb-4 tracking-widest text-blue-400">
+          <h4 className="text-slate-500 text-xs font-bold uppercase mb-4 tracking-widest">
             Primary Risk Drivers
           </h4>
           <div className="space-y-4">
