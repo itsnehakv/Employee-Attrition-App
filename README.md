@@ -79,7 +79,7 @@ Employee turnover is a multi-billion dollar problem. This project provides HR te
 - **Robust Debugging:** Implemented a comprehensive logging and "Safety Mechanism" layer to catch rate-limit exceptions before they crashed the frontend.
 
 ### 2. Prioritizing Business Impact (From SMOTE to Cost-Sensitivity)
-- **The Problem:** - Initial attempts to handle dataset imbalance using **SMOTE** (Synthetic Minority Over-sampling Technique) resulted in lower Precision and Recall, as the synthetic data introduced noise that hindered the model's ability to generalize to real employee behavior.
+**The Problem:** Initial attempts to handle dataset imbalance using **SMOTE** (Synthetic Minority Over-sampling Technique) resulted in lower Precision and Recall, as the synthetic data introduced noise that hindered the model's ability to generalize to real employee behavior.
 - **The Pivot:** I pivoted to **Cost-Sensitive Learning** by tuning the `scale_pos_weight` parameter & I abandoned the resampled `X_train_res` dataset in favor of the original, authentic **`X_train`**. This forced the model to learn from real-world distributions while penalizing the misclassification of flight risks, significantly improving the model's predictive reliability.
 
 <div align="center">
