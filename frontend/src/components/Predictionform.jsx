@@ -77,13 +77,19 @@ const Predictionform = ({
           p.toLowerCase().includes(posQuery.toLowerCase())
         );
 
+  const scrollToResults = () => {
+    setTimeout(() => {
+      resultsRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 100); // Timeout ensures the DOM has rendered the Gauge before scrolling
+  };
+
   // Scroll to results when prediction is received/prediction state changes
   useEffect(() => {
     if (globalPrediction) {
       setPrediction(globalPrediction);
-    }
-    if (prediction && resultsRef.current) {
-      resultsRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [globalPrediction, prediction]);
 
@@ -152,6 +158,7 @@ const Predictionform = ({
       // Update local and global state
       setPrediction(fullReport);
       setGlobalPrediction?.(fullReport);
+      scrollToResults();
 
       const dbResponse = await fetch(`${API_BASE_URL}/api/save-report`, {
         method: "POST",
