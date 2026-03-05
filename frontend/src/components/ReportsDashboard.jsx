@@ -9,6 +9,8 @@ import {
   Download,
 } from "lucide-react";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
 const ReportsDashboard = ({ globalPrediction }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -127,8 +129,7 @@ const ReportsDashboard = ({ globalPrediction }) => {
       </div>
       <button
         onClick={() =>
-          (window.location.href =
-            "http://localhost:8000/api/reports/download-csv")
+          (window.location.href = `${API_BASE_URL}/api/reports/download-csv`)
         }
         className="flex items-center gap-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-6 py-2.5 rounded-2xl transition-all font-bold text-xs uppercase tracking-widest"
       >

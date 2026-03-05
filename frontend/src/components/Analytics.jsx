@@ -10,7 +10,10 @@ const Analytics = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/api/analytics/summary")
+    const API_BASE_URL =
+      import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
+    fetch(`${API_BASE_URL}/api/analytics/summary`)
       .then((res) => res.json())
       .then((json) => {
         setData(json);

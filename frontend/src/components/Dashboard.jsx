@@ -13,12 +13,14 @@ const Dashboard = () => {
   });
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/api/dashboard-stats")
+    const API_BASE_URL =
+      import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+    fetch(`${API_BASE_URL}/api/dashboard-stats`)
       .then((res) => res.json())
       .then((data) => setStats(data))
       .catch((err) => console.error("Stats Fetch Error:", err));
 
-    fetch("http://127.0.0.1:8000/api/get-history")
+    fetch(`${API_BASE_URL}/api/get-history`)
       .then((res) => res.json())
       .then((data) => setHistory(data))
       .catch((err) => console.error("History Fetch Error:", err));

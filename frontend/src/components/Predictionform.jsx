@@ -40,6 +40,8 @@ const POSITIONS = [
 - setGlobalPrediction is passed down from App.jsx to allow the Predictionform to update the global state with 
   the latest prediction, which is then accessed by the ReportsDashboard to display data
  */
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
 const Predictionform = ({
   prediction: globalPrediction,
   setGlobalPrediction,
@@ -131,7 +133,7 @@ const Predictionform = ({
     };
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/predictor", {
+      const response = await fetch(`${API_BASE_URL}/predictor`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -151,7 +153,7 @@ const Predictionform = ({
       setPrediction(fullReport);
       setGlobalPrediction?.(fullReport);
 
-      const dbResponse = await fetch("http://127.0.0.1:8000/api/save-report", {
+      const dbResponse = await fetch(`${API_BASE_URL}/api/save-report`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(fullReport),
@@ -179,7 +181,7 @@ const Predictionform = ({
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
-      const response = await fetch("http://127.0.0.1:8000/api/upload-pdf", {
+      const response = await fetch(`${API_BASE_URL}/api/upload-pdf`, {
         method: "POST",
         body: uploadData,
         signal: controller.signal,

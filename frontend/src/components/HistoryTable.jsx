@@ -15,11 +15,14 @@ const HistoryTable = ({ history, setHistory }) => {
   });
 
   const handleDelete = async (reportId) => {
+    const API_BASE_URL =
+      import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
     if (!window.confirm("Are you sure you want to delete this record?")) return;
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/delete-report/${reportId}`,
+        `${API_BASE_URL}/api/delete-report/${reportId}`,
         { method: "DELETE" }
       );
 
@@ -27,7 +30,7 @@ const HistoryTable = ({ history, setHistory }) => {
       if (response.ok) {
         setHistory((prev) => prev.filter((item) => item._id !== reportId));
 
-        const refreshRes = await fetch("http://127.0.0.1:8000/api/get-history");
+        const refreshRes = await fetch(`${API_BASE_URL}/api/get-history`);
         const newData = await refreshRes.json();
         setHistory(newData);
       }
