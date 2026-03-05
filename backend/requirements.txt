@@ -2,3 +2,12 @@ joblib~=1.5.3
 pandas~=2.2.3
 fastapi~=0.133.1
 pydantic~=2.12.5
+uvicorn
+numpy
+xgboost
+python-dotenv
+motor
+pymongo
+google-genai
+pymupdf
+python-multipart
