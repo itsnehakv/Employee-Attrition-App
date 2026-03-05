@@ -1,7 +1,17 @@
 # Employee Attrition Predictor
 
-<div align="center"><a href="https://employee-attrition-app-tawny.vercel.app" alt="RetainAI Live Dashboard"><img src="https://img.shields.io/badge/Retain.AI_Live_Dashboard_↗-darkblue?style=for-the-badge" /></a></div>
-
+<div align="center"><a href="https://employee-attrition-app-tawny.vercel.app" alt="RetainAI Live Dashboard"><img src="https://img.shields.io/badge/Retain.AI_Live_Dashboard_↗-darkblue?style=for-the-badge" /></a>
+  
+  <br />
+  <br />
+  <br />
+  
+<p align="center">
+    <kbd><b>PLATFORM WALKTHROUGH</b></kbd>
+  </p>
+  
+  <img src="AttritionDemo.gif" width="900" alt="RetainAI Demo" />
+</div>
 
 ## *Strategic AI for Talent Retention & Cost Optimization*
 ###  Business Impact
