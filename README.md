@@ -93,11 +93,6 @@ Employee turnover is a multi-billion dollar problem. This project provides HR te
 | **Data Integrity** | Synthetic | **Organic (Original)** | No "hallucinated" data |
 </div>
 
-
-### 💡 Why this iteration matters
-By moving away from SMOTE, the model now learns from **real employee patterns** rather than artificial data points. The 5% increase in **Class 0 Recall** is critical for HR applications, as it minimizes "False Alarms"—ensuring management focus and retention resources are directed toward the employees at highest risk.
-## Installation & Setup
-
 #### Backend (FastAPI)
 1. Navigate to `/backend` and create a `.env` file with your `GEMINI_API_KEY` and `MONGO_URI`.
 2. Install dependencies: `pip install -r requirements.txt`
