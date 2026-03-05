@@ -8,7 +8,6 @@ import joblib
 from dotenv import load_dotenv
 from fastapi import Body, UploadFile, File, Request
 from datetime import datetime, timezone
-from contextlib import asynccontextmanager
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorClient
 import sys
@@ -70,6 +69,13 @@ STRICT RULES:
 
 #*------------------------------*
 
+FRONTEND_LINK = os.getenv("FRONTEND_URL", "http://localhost:5173")
+origins = [
+    "http://localhost:5173",
+    FRONTEND_LINK
+]
+
+
 async def lifespan(app: FastAPI):
     uri = os.getenv("MONGO_URI")
 
@@ -92,7 +98,7 @@ app = FastAPI(title="HR Attrition Predictor API",lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Allows any origin
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"], # Allows POST, OPTIONS, GET, etc.
     allow_headers=["*"], # Allows Content-Type, Authorization, etc.
