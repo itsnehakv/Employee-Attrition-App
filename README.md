@@ -1,7 +1,7 @@
 # Employee Attrition Predictor
 
 <div align="center"><a href="https://employee-attrition-app-tawny.vercel.app" alt="RetainAI Live Dashboard"><img src="https://img.shields.io/badge/Retain.AI_Live_Dashboard_↗-darkblue?style=for-the-badge" /></a>
-  
+
   <br />
   <br />
   <br />
@@ -82,6 +82,20 @@ Employee turnover is a multi-billion dollar problem. This project provides HR te
 - **The Problem:** - Initial attempts to handle dataset imbalance using **SMOTE** (Synthetic Minority Over-sampling Technique) resulted in lower Precision and Recall, as the synthetic data introduced noise that hindered the model's ability to generalize to real employee behavior.
 - **The Pivot:** I pivoted to **Cost-Sensitive Learning** by tuning the `scale_pos_weight` parameter & I abandoned the resampled `X_train_res` dataset in favor of the original, authentic **`X_train`**. This forced the model to learn from real-world distributions while penalizing the misclassification of flight risks, significantly improving the model's predictive reliability.
 
+<div align="center">
+  
+| Metric | Old Model (SMOTE) | New Model (Weighted XGBoost) | Impact |
+| :--- | :--- | :--- | :--- |
+| **Overall Accuracy** | 67.00% | **69.84%** | `+2.84%` Improvement |
+| **Precision (Class 1)** | 53.00% | **60.00%** | Higher reliability in flags |
+| **Recall (Class 1)** | 41.00% | 41.00% | Consistent detection rate |
+| **Class 0 Recall** | 80.00% | **85.00%** | `5%` fewer False Positives |
+| **Data Integrity** | Synthetic | **Organic (Original)** | No "hallucinated" data |
+</div>
+
+
+### 💡 Why this iteration matters
+By moving away from SMOTE, the model now learns from **real employee patterns** rather than artificial data points. The 5% increase in **Class 0 Recall** is critical for HR applications, as it minimizes "False Alarms"—ensuring management focus and retention resources are directed toward the employees at highest risk.
 ## Installation & Setup
 
 #### Backend (FastAPI)
@@ -92,7 +106,11 @@ Employee turnover is a multi-billion dollar problem. This project provides HR te
 #### Frontend (React)
 1. Navigate to `/frontend` and install dependencies: `npm install`
 2. Start the development server: `npm run dev`
-   
+
+## References
+
+[SMOTE](https://www.geeksforgeeks.org/machine-learning/ml-handling-imbalanced-data-with-smote-and-near-miss-algorithm-in-python) • [No module error](https://www.geeksforgeeks.org/python/how-to-fix-no-module-named-xgboost-in-python) • [Deprecated dict in Pydantic](https://github.com/fastapi/fastapi/discussions/11912) • [Gemini API quickstart](https://ai.google.dev/gemini-api/docs/quickstart#python) • [MongoDB Atlas pipeline stages](https://www.mongodb.com/docs/manual/reference/mql/aggregation-stages)
+
 ---
 <div align="center">
   
