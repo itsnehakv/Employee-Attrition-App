@@ -94,6 +94,7 @@ Employee turnover is a multi-billion dollar problem. This project provides HR te
 | **Data Integrity** | Synthetic | **Organic (Original)** | No "hallucinated" data |
 </div>
 
+## Local Development Setup
 #### Backend (FastAPI)
 1. Navigate to `/backend` and create a `.env` file with your `GEMINI_API_KEY` and `MONGO_URI`.
 2. Install dependencies: `pip install -r requirements.txt`
