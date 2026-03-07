@@ -38,7 +38,8 @@ Employee turnover is a multi-billion dollar problem. This project provides HR te
 
 </div>
 
-
+## Dataset
+ ➤ <a href="https://www.kaggle.com/datasets/rhuebner/human-resources-data-set" alt="Link to Dataset"> Human Resources Data Set</a> by  Dr. Carla Patalano and Dr. Rich Huebner
 
 ##  Key Features
 - **GenAI Resume Parsing:** Uses **Google Gemini Pro** to extract complex employee metrics from uploaded PDFs, bypassing manual data entry.
