@@ -1,6 +1,6 @@
 # RETAIN.AI | Employee Attrition Predictor
 
-<div align="center"><a href="https://employee-attrition-app-tawny.vercel.app" alt="RetainAI Live Dashboard"><img src="https://img.shields.io/badge/Retain.AI_Live_Dashboard_↗-darkblue?style=for-the-badge" /></a>
+<div align="center"><a href="https://employee-attrition-app-itsnehakv.vercel.app" alt="RetainAI Live Dashboard"><img src="https://img.shields.io/badge/Retain.AI_Live_Dashboard_↗-darkblue?style=for-the-badge" /></a>
 
   <br />
   <br />
